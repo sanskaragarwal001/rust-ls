@@ -48,13 +48,13 @@ fn main() {
                 }
                 continue;
             }
-
-            config.files.push(arg);
         }
 
-        if expected_output {
-            eprintln!("Error: --output requires a value but none was provided");
-        }
+        config.files.push(arg);
+    }
+
+    if expected_output {
+        eprintln!("Error: --output requires a value but none was provided");
     }
 
     println!("{:?}", config);
