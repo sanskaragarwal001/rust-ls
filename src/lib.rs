@@ -3,6 +3,7 @@ pub struct Config {
     pub show_all: bool,
     pub list_format: bool,
     pub files: Vec<String>,
+    pub output: Option<String>,
 }
 
 impl Config {
@@ -11,6 +12,7 @@ impl Config {
             show_all: false,
             list_format: false,
             files: vec![],
+            output: None,
         }
     }
 }
