@@ -1,23 +1,19 @@
 use std::env;
-use std::fs;
+
+use rust_ls::Config;
 
 fn main() {
-    /*
-     * ls [path] - without flags
-     */
-
     let args: Vec<String> = env::args().collect();
 
-    let path = match args.last() {
-        Some(path) => path,
-        None => ".",
-    };
+    let mut config = Config::new();
 
-    let contents = fs::read_dir(path).expect("failed to read the directory content.");
-    for content in contents {
-        match content {
-            Ok(meta) => println!("{0:?}", meta.file_name()),
-            Err(_) => eprintln!("failed to read the directory name."),
+    for arg in args.into_iter().skip(1) {
+        match arg.as_str() {
+            "-a" => config.show_all = true,
+            "-l" => config.list_format = true,
+            _ => config.files.push(arg),
         }
     }
+
+    println!("{:?}", config);
 }

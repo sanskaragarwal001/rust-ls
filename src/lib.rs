@@ -1,14 +1,24 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+#[derive(Debug)]
+pub struct Config {
+    pub show_all: bool,
+    pub list_format: bool,
+    pub files: Vec<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl Config {
+    pub fn new() -> Self {
+        Config {
+            show_all: false,
+            list_format: false,
+            files: vec![],
+        }
     }
+}
+
+pub fn show_all_files() {
+    println!("show all files");
+}
+
+pub fn show_list_format() {
+    println!("show list format");
 }
