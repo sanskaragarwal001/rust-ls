@@ -18,7 +18,18 @@ fn main() {
         let path = Path::new(str_path);
 
         let mut contents = read_contents_of_given_directory(&path).unwrap();
-        contents.sort_by_key(|os_str| os_str.to_string_lossy().to_lowercase());
+        if config.display_directory_order == false {
+            contents.sort_by(|a, b| {
+                let a_str = a.to_string_lossy().to_lowercase();
+                let b_str = b.to_string_lossy().to_lowercase();
+
+                // Strip the leading dot if it exists for the sake of comparison
+                let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
+                let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
+
+                a_normalized.cmp(b_normalized)
+            });
+        }
 
         if config.newline {
             print_newline(&contents, config.all || config.almost_all);
@@ -55,6 +66,7 @@ fn parse_ls_arguments(args: &Vec<String>) -> Config {
                     'a' => config.all = true,
                     '1' => config.newline = true,
                     'l' => config.print_list_format = true,
+                    'f' => config.display_directory_order = true,
                     'h' => config.human_readable_size = true,
                     'r' => config.print_reverse = true,
                     'R' => config.show_subdirectories_content = true,
