@@ -12,7 +12,12 @@ use rust_ls::Config;
  */
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let config = parse_ls_arguments(&args);
 
+    println!("{config:?}");
+}
+
+fn parse_ls_arguments(args: &Vec<String>) -> Config {
     let mut config = Config::new();
     for arg in args.into_iter().skip(1) {
         if arg.starts_with("---") {
@@ -50,12 +55,13 @@ fn main() {
             }
             continue;
         } else {
-            config.files.push(arg);
+            config.files.push(arg.clone());
         }
     }
 
     if config.files.is_empty() {
         config.files.push(String::from("."));
     }
-    println!("{config:?}");
+
+    config
 }
