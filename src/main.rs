@@ -30,12 +30,36 @@ fn main() {
                 a_normalized.cmp(b_normalized)
             });
         }
+        if config.print_reverse {
+            if config.display_directory_order == false {
+                contents.sort_by(|a, b| {
+                    let a_str = a.to_string_lossy().to_lowercase();
+                    let b_str = b.to_string_lossy().to_lowercase();
 
-        if config.newline {
-            print_newline(&contents, config.all || config.almost_all);
-        } else {
-            print_space(&contents, config.all || config.almost_all);
+                    // Strip the leading dot if it exists for the sake of comparison
+                    let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
+                    let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
+
+                    a_normalized.cmp(b_normalized)
+                });
+
+                contents.reverse();
+            }
         }
+
+        println!("{str_path}:");
+        if config.newline {
+            print_newline(
+                &contents,
+                config.almost_all || config.display_directory_order,
+            );
+        } else {
+            print_space(
+                &contents,
+                config.almost_all || config.display_directory_order,
+            );
+        }
+        println!("\n");
     }
 }
 
