@@ -1,7 +1,7 @@
+use std::path::Path;
 use std::{env, process::exit};
 
-use rust_ls::Config;
-
+use rust_ls::{Config, print_newline, print_space, read_contents_of_given_directory};
 /*
  * parser without
  *
@@ -14,7 +14,18 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let config = parse_ls_arguments(&args);
 
-    println!("{config:?}");
+    for str_path in &config.files {
+        let path = Path::new(str_path);
+
+        let mut contents = read_contents_of_given_directory(&path).unwrap();
+        contents.sort_by_key(|os_str| os_str.to_string_lossy().to_lowercase());
+
+        if config.newline {
+            print_newline(&contents, config.all || config.almost_all);
+        } else {
+            print_space(&contents, config.all || config.almost_all);
+        }
+    }
 }
 
 fn parse_ls_arguments(args: &Vec<String>) -> Config {
