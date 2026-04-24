@@ -1,7 +1,10 @@
 use std::path::Path;
 use std::{env, process::exit};
 
-use rust_ls::{Config, print_newline, print_space, read_contents_of_given_directory};
+use rust_ls::{
+    Config, print_btree, print_newline, print_space, read_contents_of_given_directory,
+    read_recursive,
+};
 /*
  * parser without
  *
@@ -17,20 +20,11 @@ fn main() {
     for str_path in &config.files {
         let path = Path::new(str_path);
 
-        let mut contents = read_contents_of_given_directory(&path).unwrap();
-        if config.display_directory_order == false {
-            contents.sort_by(|a, b| {
-                let a_str = a.to_string_lossy().to_lowercase();
-                let b_str = b.to_string_lossy().to_lowercase();
-
-                // Strip the leading dot if it exists for the sake of comparison
-                let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
-                let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
-
-                a_normalized.cmp(b_normalized)
-            });
-        }
-        if config.print_reverse {
+        if config.show_subdirectories_content {
+            let contents = read_recursive(&path, &config).unwrap();
+            print_btree(&contents, &config);
+        } else {
+            let mut contents = read_contents_of_given_directory(&path).unwrap();
             if config.display_directory_order == false {
                 contents.sort_by(|a, b| {
                     let a_str = a.to_string_lossy().to_lowercase();
@@ -42,24 +36,38 @@ fn main() {
 
                     a_normalized.cmp(b_normalized)
                 });
-
-                contents.reverse();
             }
-        }
+            if config.print_reverse {
+                if config.display_directory_order == false {
+                    contents.sort_by(|a, b| {
+                        let a_str = a.to_string_lossy().to_lowercase();
+                        let b_str = b.to_string_lossy().to_lowercase();
 
-        println!("{str_path}:");
-        if config.newline {
-            print_newline(
-                &contents,
-                config.almost_all || config.display_directory_order,
-            );
-        } else {
-            print_space(
-                &contents,
-                config.almost_all || config.display_directory_order,
-            );
+                        // Strip the leading dot if it exists for the sake of comparison
+                        let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
+                        let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
+
+                        a_normalized.cmp(b_normalized)
+                    });
+
+                    contents.reverse();
+                }
+            }
+
+            println!("{str_path}:");
+            if config.newline {
+                print_newline(
+                    &contents,
+                    config.almost_all || config.display_directory_order,
+                );
+            } else {
+                print_space(
+                    &contents,
+                    config.almost_all || config.display_directory_order,
+                );
+            }
+            println!("\n");
         }
-        println!("\n");
     }
 }
 
@@ -72,7 +80,6 @@ fn parse_ls_arguments(args: &Vec<String>) -> Config {
 
         if arg.starts_with("--") {
             match arg.as_str() {
-                "--all" => config.all = true,
                 "--almost-all" => config.almost_all = true,
                 "--human-readable" => config.human_readable_size = true,
                 "--reverse" => config.print_reverse = true,
@@ -87,7 +94,6 @@ fn parse_ls_arguments(args: &Vec<String>) -> Config {
             for ch in arg.chars().skip(1) {
                 match ch {
                     'A' => config.almost_all = true,
-                    'a' => config.all = true,
                     '1' => config.newline = true,
                     'l' => config.print_list_format = true,
                     'f' => config.display_directory_order = true,

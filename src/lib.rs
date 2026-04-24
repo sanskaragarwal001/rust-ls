@@ -1,11 +1,12 @@
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Config {
-    pub all: bool,
     pub almost_all: bool,
     pub print_reverse: bool,
     pub show_subdirectories_content: bool,
@@ -20,7 +21,6 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         Config {
-            all: false,
             almost_all: false,
             print_reverse: false,
             display_directory_order: false,
@@ -70,6 +70,69 @@ pub fn print_newline(contents: &Vec<OsString>, includes_content_starts_with_peri
             println!("{content:?}");
         }
     }
+}
+
+pub fn print_btree(contents: &BTreeMap<PathBuf, Vec<String>>, config: &Config) {
+    for (key, value) in contents.iter() {
+        println!("{}", key.display());
+
+        if config.newline {
+            for entry in value {
+                println!("{entry}");
+            }
+        } else {
+            for entry in value {
+                print!("{entry} ");
+            }
+        }
+
+        println!("\n");
+    }
+}
+
+pub fn read_recursive(
+    path: &Path,
+    config: &Config,
+) -> Result<BTreeMap<PathBuf, Vec<String>>, io::Error> {
+    let mut all_data = BTreeMap::new();
+
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(&path)? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+
+        if !config.almost_all && name.starts_with('.') {
+            continue;
+        }
+
+        entries.push(name);
+    }
+
+    if config.display_directory_order == false {
+        entries.sort_by(|a, b| {
+            let a_n = a.to_lowercase();
+            let b_n = b.to_lowercase();
+
+            a_n.strip_prefix('.')
+                .unwrap_or(&a_n)
+                .cmp(b_n.strip_prefix('.').unwrap_or(&b_n))
+        });
+    }
+    if config.display_directory_order == false && config.print_reverse {
+        entries.reverse();
+    }
+
+    all_data.insert(path.to_path_buf(), entries.clone());
+
+    for name in entries {
+        let full_path = path.join(&name);
+        if full_path.is_dir() {
+            let sub_results = read_recursive(&full_path, config)?;
+            all_data.extend(sub_results);
+        }
+    }
+
+    Ok(all_data)
 }
 
 #[cfg(test)]
