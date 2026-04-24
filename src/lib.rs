@@ -1,7 +1,9 @@
+use chrono::{DateTime, Local};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs;
 use std::io;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -133,6 +135,35 @@ pub fn read_recursive(
     }
 
     Ok(all_data)
+}
+
+pub fn read_list(config: &Config) {
+    // let sys_time = SystemTime::now();
+    for str_path in &config.files {
+        let path = Path::new(str_path);
+
+        for dir in fs::read_dir(&path).unwrap() {
+            let dir = dir.unwrap();
+
+            let path = dir.path();
+            let metadata = path.metadata().expect("metadata call failed");
+
+            // let duration = sys_time
+            //     .duration_since(metadata.modified().unwrap())
+            //     .expect("Time went backwards");
+            let last_modified_time: DateTime<Local> = metadata.modified().unwrap().into();
+            println!(
+                "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
+                metadata.permissions().mode(),
+                metadata.nlink(),
+                metadata.uid(),
+                metadata.gid(),
+                metadata.size(),
+                last_modified_time.format("%b %d %H:%M").to_string(),
+                dir.file_name(),
+            );
+        }
+    }
 }
 
 #[cfg(test)]
