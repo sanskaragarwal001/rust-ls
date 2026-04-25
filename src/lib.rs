@@ -167,6 +167,11 @@ pub fn read_list_recursive(
         let user_name = get_user_by_uid(metadata.uid()).unwrap();
         let group_name = get_group_by_gid(metadata.gid()).unwrap();
         let last_modified_time = last_modified_time.format("%b %d %H:%M").to_string();
+        let size = if config.human_readable_size {
+            format_size(metadata.size())
+        } else {
+            metadata.size().to_string()
+        };
 
         let content = format!(
             "{0} {1} {2} {3} {4} {5} {6}",
@@ -174,7 +179,7 @@ pub fn read_list_recursive(
             metadata.nlink(),
             user_name.name().display(),
             group_name.name().display(),
-            metadata.size(),
+            size,
             last_modified_time,
             entries.file_name().display()
         );
@@ -238,6 +243,27 @@ fn parse_permissions(mode: u32) -> String {
     s
 }
 
+pub fn format_size(bytes: u64) -> String {
+    let units = ["B", "K", "M", "G", "T", "P"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+
+    // Scale the number down by 1024 for each unit
+    while size >= 1024.0 && unit_index < units.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+
+    // Formatting rules:
+    // 1. If it's just bytes, don't show decimals (e.g., "12B")
+    // 2. If it's a directory (usually 4096 bytes), show "4.0K"
+    // 3. For larger files, show one decimal place (e.g., "120K", "1.2M")
+    if unit_index == 0 {
+        format!("{}{}", bytes, units[unit_index])
+    } else {
+        format!("{:.1}{}", size, units[unit_index])
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
