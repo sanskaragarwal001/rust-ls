@@ -6,6 +6,7 @@ use std::io;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::path::PathBuf;
+use uzers::{get_group_by_gid, get_user_by_uid};
 
 #[derive(Debug)]
 pub struct Config {
@@ -154,16 +155,53 @@ pub fn read_list(config: &Config) {
             let last_modified_time: DateTime<Local> = metadata.modified().unwrap().into();
             println!(
                 "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
-                metadata.permissions().mode(),
+                parse_permissions(metadata.permissions().mode()),
                 metadata.nlink(),
-                metadata.uid(),
-                metadata.gid(),
+                get_user_by_uid(metadata.uid()).unwrap().name(),
+                get_group_by_gid(metadata.gid()).unwrap().name(),
                 metadata.size(),
                 last_modified_time.format("%b %d %H:%M").to_string(),
                 dir.file_name(),
             );
         }
     }
+}
+
+fn parse_permissions(mode: u32) -> String {
+    let mut s = String::with_capacity(10);
+
+    // 1. Determine File Type
+    let file_type = if mode & 0o170000 == 0o040000 {
+        'd'
+    } else if mode & 0o170000 == 0o120000 {
+        'l'
+    } else {
+        '-'
+    };
+    s.push(file_type);
+
+    // 2. Define the bits we want to check
+    let bits = [
+        (0o400, 'r'),
+        (0o200, 'w'),
+        (0o100, 'x'), // Owner
+        (0o040, 'r'),
+        (0o020, 'w'),
+        (0o010, 'x'), // Group
+        (0o004, 'r'),
+        (0o002, 'w'),
+        (0o001, 'x'), // Others
+    ];
+
+    for (bit, char) in bits {
+        if mode & bit != 0 {
+            s.push(char);
+        } else {
+            s.push('-');
+        }
+    }
+
+    s
 }
 
 #[cfg(test)]

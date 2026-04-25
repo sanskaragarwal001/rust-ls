@@ -148,6 +148,7 @@ name = "rust-ls"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "uzers",
 ]
 
 [[package]]
@@ -178,6 +179,16 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "uzers"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b8275fb1afee25b4111d2dc8b5c505dbbc4afd0b990cb96deb2d88bff8be18d"
+dependencies = [
+ "libc",
+ "log",
+]
 
 [[package]]
 name = "wasm-bindgen"
