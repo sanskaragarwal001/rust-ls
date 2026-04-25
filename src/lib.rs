@@ -16,7 +16,7 @@ pub struct Config {
     pub display_directory_order: bool,
     pub newline: bool,
     pub print_list_format: bool,
-    pub size: bool,
+    // pub size: bool,
     pub human_readable_size: bool,
     pub files: Vec<String>,
 }
@@ -30,7 +30,6 @@ impl Config {
             show_subdirectories_content: false,
             newline: false,
             print_list_format: false,
-            size: false,
             human_readable_size: false,
             files: vec![],
         }
