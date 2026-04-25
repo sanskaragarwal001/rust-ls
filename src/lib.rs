@@ -79,7 +79,7 @@ pub fn print_btree(contents: &BTreeMap<PathBuf, Vec<String>>, config: &Config) {
     for (key, value) in contents.iter() {
         println!("{}", key.display());
 
-        if config.newline {
+        if config.newline || config.print_list_format {
             for entry in value {
                 println!("{entry}");
             }
@@ -138,33 +138,68 @@ pub fn read_recursive(
     Ok(all_data)
 }
 
-pub fn read_list(config: &Config) {
-    // let sys_time = SystemTime::now();
-    for str_path in &config.files {
-        let path = Path::new(str_path);
+pub fn read_list_recursive(
+    path: &Path,
+    config: &Config,
+) -> Result<BTreeMap<PathBuf, Vec<String>>, io::Error> {
+    let mut res: BTreeMap<PathBuf, Vec<String>> = BTreeMap::new();
 
-        for dir in fs::read_dir(&path).unwrap() {
-            let dir = dir.unwrap();
+    let path = Path::new(path);
+    let mut sub_directories: Vec<String> = Vec::new();
+    let mut contents: Vec<String> = Vec::new();
+    for entries in fs::read_dir(&path).unwrap() {
+        let entries = entries.unwrap();
 
-            let path = dir.path();
-            let metadata = path.metadata().expect("metadata call failed");
+        let file_name = entries.file_name();
+        if config.almost_all == false && file_name.to_string_lossy().starts_with(".") {
+            continue;
+        }
 
-            // let duration = sys_time
-            //     .duration_since(metadata.modified().unwrap())
-            //     .expect("Time went backwards");
-            let last_modified_time: DateTime<Local> = metadata.modified().unwrap().into();
-            println!(
-                "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
-                parse_permissions(metadata.permissions().mode()),
-                metadata.nlink(),
-                get_user_by_uid(metadata.uid()).unwrap().name(),
-                get_group_by_gid(metadata.gid()).unwrap().name(),
-                metadata.size(),
-                last_modified_time.format("%b %d %H:%M").to_string(),
-                dir.file_name(),
-            );
+        let path = entries.path();
+        let metadata = path.metadata().expect("metadata call failed");
+
+        if config.show_subdirectories_content && path.is_dir() {
+            sub_directories.push(file_name.into_string().unwrap());
+        }
+
+        let last_modified_time: DateTime<Local> = metadata.modified().unwrap().into();
+
+        let permission_in_string = parse_permissions(metadata.permissions().mode());
+        let user_name = get_user_by_uid(metadata.uid()).unwrap();
+        let group_name = get_group_by_gid(metadata.gid()).unwrap();
+        let last_modified_time = last_modified_time.format("%b %d %H:%M").to_string();
+
+        let content = format!(
+            "{0} {1} {2} {3} {4} {5} {6}",
+            permission_in_string,
+            metadata.nlink(),
+            user_name.name().display(),
+            group_name.name().display(),
+            metadata.size(),
+            last_modified_time,
+            entries.file_name().display()
+        );
+
+        contents.push(content);
+    }
+
+    if config.print_reverse {
+        contents.reverse();
+        sub_directories.reverse();
+    }
+
+    res.insert(path.to_path_buf(), contents);
+
+    if config.show_subdirectories_content {
+        for sub_directory in sub_directories {
+            let full_path = path.join(&sub_directory);
+            let sub_dir_contents = read_list_recursive(&full_path, &config).unwrap();
+
+            res.extend(sub_dir_contents);
         }
     }
+
+    Ok(res)
 }
 
 fn parse_permissions(mode: u32) -> String {

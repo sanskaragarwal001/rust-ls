@@ -2,8 +2,8 @@ use std::path::Path;
 use std::{env, process::exit};
 
 use rust_ls::{
-    Config, print_btree, print_newline, print_space, read_contents_of_given_directory, read_list,
-    read_recursive,
+    Config, print_btree, print_newline, print_space, read_contents_of_given_directory,
+    read_list_recursive, read_recursive,
 };
 /*
  * parser without
@@ -17,59 +17,61 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let config = parse_ls_arguments(&args);
 
-    // for str_path in &config.files {
-    //     let path = Path::new(str_path);
+    for str_path in &config.files {
+        let path = Path::new(str_path);
 
-    //     if config.show_subdirectories_content {
-    //         let contents = read_recursive(&path, &config).unwrap();
-    //         print_btree(&contents, &config);
-    //     } else {
-    //         let mut contents = read_contents_of_given_directory(&path).unwrap();
-    //         if config.display_directory_order == false {
-    //             contents.sort_by(|a, b| {
-    //                 let a_str = a.to_string_lossy().to_lowercase();
-    //                 let b_str = b.to_string_lossy().to_lowercase();
+        if config.print_list_format {
+            let contents = read_list_recursive(&path, &config).unwrap();
+            print_btree(&contents, &config);
+        } else if config.show_subdirectories_content {
+            let contents = read_recursive(&path, &config).unwrap();
+            print_btree(&contents, &config);
+        } else {
+            let mut contents = read_contents_of_given_directory(&path).unwrap();
+            if config.display_directory_order == false {
+                contents.sort_by(|a, b| {
+                    let a_str = a.to_string_lossy().to_lowercase();
+                    let b_str = b.to_string_lossy().to_lowercase();
 
-    //                 // Strip the leading dot if it exists for the sake of comparison
-    //                 let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
-    //                 let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
+                    // Strip the leading dot if it exists for the sake of comparison
+                    let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
+                    let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
 
-    //                 a_normalized.cmp(b_normalized)
-    //             });
-    //         }
-    //         if config.print_reverse {
-    //             if config.display_directory_order == false {
-    //                 contents.sort_by(|a, b| {
-    //                     let a_str = a.to_string_lossy().to_lowercase();
-    //                     let b_str = b.to_string_lossy().to_lowercase();
+                    a_normalized.cmp(b_normalized)
+                });
+            }
+            if config.print_reverse {
+                if config.display_directory_order == false {
+                    contents.sort_by(|a, b| {
+                        let a_str = a.to_string_lossy().to_lowercase();
+                        let b_str = b.to_string_lossy().to_lowercase();
 
-    //                     // Strip the leading dot if it exists for the sake of comparison
-    //                     let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
-    //                     let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
+                        // Strip the leading dot if it exists for the sake of comparison
+                        let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
+                        let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
 
-    //                     a_normalized.cmp(b_normalized)
-    //                 });
+                        a_normalized.cmp(b_normalized)
+                    });
 
-    //                 contents.reverse();
-    //             }
-    //         }
+                    contents.reverse();
+                }
+            }
 
-    //         println!("{str_path}:");
-    //         if config.newline {
-    //             print_newline(
-    //                 &contents,
-    //                 config.almost_all || config.display_directory_order,
-    //             );
-    //         } else {
-    //             print_space(
-    //                 &contents,
-    //                 config.almost_all || config.display_directory_order,
-    //             );
-    //         }
-    //         println!("\n");
-    //     }
-    // }
-    read_list(&config);
+            println!("{str_path}:");
+            if config.newline {
+                print_newline(
+                    &contents,
+                    config.almost_all || config.display_directory_order,
+                );
+            } else {
+                print_space(
+                    &contents,
+                    config.almost_all || config.display_directory_order,
+                );
+            }
+            println!("\n");
+        }
+    }
 }
 
 fn parse_ls_arguments(args: &Vec<String>) -> Config {
