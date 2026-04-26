@@ -108,6 +108,12 @@ pub fn print_on_console(entries: &mut Vec<FileMetaData>, config: &LsConfig) {
             continue;
         }
 
+        let size = if config.human_readable_size {
+            format_size(entry.size_in_bytes)
+        } else {
+            entry.size_in_bytes.to_string()
+        };
+
         if config.newline {
             if config.list {
                 println!(
@@ -116,18 +122,18 @@ pub fn print_on_console(entries: &mut Vec<FileMetaData>, config: &LsConfig) {
                     entry.nlink,
                     entry.user_name.display(),
                     entry.group_name.display(),
-                    entry.size_in_bytes,
+                    size,
                     entry.last_modified,
                     entry.file_name.display()
                 );
             } else if config.size_in_bytes {
-                println!("({}) {}", entry.size_in_bytes, entry.file_name.display());
+                println!("({}) {}", size, entry.file_name.display());
             } else {
                 println!("{}", entry.file_name.display());
             }
         } else {
             if config.size_in_bytes {
-                print!("({}) {} ", entry.size_in_bytes, entry.file_name.display());
+                print!("({}) {} ", size, entry.file_name.display());
             } else {
                 print!("{} ", entry.file_name.display());
             }
@@ -170,4 +176,26 @@ fn parse_permissions(mode: u32) -> String {
     }
 
     s
+}
+
+fn format_size(bytes: u64) -> String {
+    let units = ["B", "K", "M", "G", "T", "P"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+
+    // Scale the number down by 1024 for each unit
+    while size >= 1024.0 && unit_index < units.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+
+    // Formatting rules:
+    // 1. If it's just bytes, don't show decimals (e.g., "12B")
+    // 2. If it's a directory (usually 4096 bytes), show "4.0K"
+    // 3. For larger files, show one decimal place (e.g., "120K", "1.2M")
+    if unit_index == 0 {
+        format!("{}{}", bytes, units[unit_index])
+    } else {
+        format!("{:.1}{}", size, units[unit_index])
+    }
 }
