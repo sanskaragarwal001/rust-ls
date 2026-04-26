@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 chrono = "0.4.44"
 uzers = "0.12.2"
+regex = "1.12.3"
