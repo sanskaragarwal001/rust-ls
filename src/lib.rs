@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local};
+use parser::LsConfig;
 use std::ffi::OsString;
 use std::fs::{self, DirEntry};
 use std::io::{self};
@@ -6,6 +7,8 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::process::exit;
 use uzers::{get_group_by_gid, get_user_by_uid};
+
+pub mod parser;
 
 #[derive(Debug)]
 pub struct FileMetaData {
@@ -90,6 +93,46 @@ pub fn sort_directory_entries_by_file_name(contents: &mut Vec<FileMetaData>) {
 
         a_normalized.cmp(b_normalized)
     });
+}
+
+pub fn print_on_console(entries: &mut Vec<FileMetaData>, config: &LsConfig) {
+    if config.sorted_order {
+        sort_directory_entries_by_file_name(entries);
+    }
+    if config.reverse {
+        entries.reverse();
+    }
+
+    for entry in entries {
+        if config.almost_all == false && entry.file_name.to_string_lossy().starts_with(".") {
+            continue;
+        }
+
+        if config.newline {
+            if config.list {
+                println!(
+                    "{} {} {} {} {} {} {}",
+                    entry.permission,
+                    entry.nlink,
+                    entry.user_name.display(),
+                    entry.group_name.display(),
+                    entry.size_in_bytes,
+                    entry.last_modified,
+                    entry.file_name.display()
+                );
+            } else if config.size_in_bytes {
+                println!("({}) {}", entry.size_in_bytes, entry.file_name.display());
+            } else {
+                println!("{}", entry.file_name.display());
+            }
+        } else {
+            if config.size_in_bytes {
+                print!("({}) {} ", entry.size_in_bytes, entry.file_name.display());
+            } else {
+                print!("{} ", entry.file_name.display());
+            }
+        }
+    }
 }
 
 fn parse_permissions(mode: u32) -> String {
