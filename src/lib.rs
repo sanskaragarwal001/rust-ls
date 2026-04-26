@@ -1,209 +1,95 @@
 use chrono::{DateTime, Local};
-use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::fs;
-use std::io;
+use std::fs::{self, DirEntry};
+use std::io::{self};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
-use std::path::PathBuf;
+use std::process::exit;
 use uzers::{get_group_by_gid, get_user_by_uid};
 
 #[derive(Debug)]
-pub struct Config {
-    pub almost_all: bool,
-    pub print_reverse: bool,
-    pub show_subdirectories_content: bool,
-    pub display_directory_order: bool,
-    pub newline: bool,
-    pub print_list_format: bool,
-    // pub size: bool,
-    pub human_readable_size: bool,
-    pub files: Vec<String>,
+pub struct FileMetaData {
+    pub permission: String,
+    pub nlink: u64,
+    pub user_name: OsString,
+    pub group_name: OsString,
+    pub size_in_bytes: u64,
+    pub last_modified: String,
+    pub file_name: OsString,
 }
 
-impl Config {
-    pub fn new() -> Self {
-        Config {
-            almost_all: false,
-            print_reverse: false,
-            display_directory_order: false,
-            show_subdirectories_content: false,
-            newline: false,
-            print_list_format: false,
-            human_readable_size: false,
-            files: vec![],
-        }
-    }
-}
+impl FileMetaData {
+    pub fn extract_metadata_from_dir_entry(entry: &DirEntry) -> Result<Self, io::Error> {
+        let metadata = entry.metadata()?;
 
-pub fn read_contents_of_given_directory(path: &Path) -> Result<Vec<OsString>, io::Error> {
-    let dir_contents = fs::read_dir(path)?;
+        let file_name = entry.file_name();
+        let permission = metadata.permissions().mode();
+        let nlink = metadata.nlink();
+        let size = metadata.size();
 
-    let mut res: Vec<OsString> = Vec::new();
-    for content in dir_contents {
-        match content {
-            Ok(c) => {
-                res.push(c.file_name());
-            }
-            Err(err) => {
-                eprintln!("{}", err.to_string())
-            }
-        }
-    }
-
-    Ok(res)
-}
-
-pub fn print_space(contents: &Vec<OsString>, includes_content_starts_with_period: bool) {
-    for content in contents {
-        if includes_content_starts_with_period {
-            print!("{content:?} ");
-        } else if content.to_string_lossy().starts_with(".") == false {
-            print!("{content:?} ");
-        }
-    }
-}
-
-pub fn print_newline(contents: &Vec<OsString>, includes_content_starts_with_period: bool) {
-    for content in contents {
-        if includes_content_starts_with_period {
-            println!("{content:?}");
-        } else if content.to_string_lossy().starts_with(".") == false {
-            println!("{content:?}");
-        }
-    }
-}
-
-pub fn print_btree(contents: &BTreeMap<PathBuf, Vec<String>>, config: &Config) {
-    for (key, value) in contents.iter() {
-        println!("{}", key.display());
-
-        if config.newline || config.print_list_format {
-            for entry in value {
-                println!("{entry}");
-            }
-        } else {
-            for entry in value {
-                print!("{entry} ");
-            }
-        }
-
-        println!("\n");
-    }
-}
-
-pub fn read_recursive(
-    path: &Path,
-    config: &Config,
-) -> Result<BTreeMap<PathBuf, Vec<String>>, io::Error> {
-    let mut all_data = BTreeMap::new();
-
-    let mut entries = Vec::new();
-    for entry in fs::read_dir(&path)? {
-        let entry = entry?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-
-        if !config.almost_all && name.starts_with('.') {
-            continue;
-        }
-
-        entries.push(name);
-    }
-
-    if config.display_directory_order == false {
-        entries.sort_by(|a, b| {
-            let a_n = a.to_lowercase();
-            let b_n = b.to_lowercase();
-
-            a_n.strip_prefix('.')
-                .unwrap_or(&a_n)
-                .cmp(b_n.strip_prefix('.').unwrap_or(&b_n))
-        });
-    }
-    if config.display_directory_order == false && config.print_reverse {
-        entries.reverse();
-    }
-
-    all_data.insert(path.to_path_buf(), entries.clone());
-
-    for name in entries {
-        let full_path = path.join(&name);
-        if full_path.is_dir() {
-            let sub_results = read_recursive(&full_path, config)?;
-            all_data.extend(sub_results);
-        }
-    }
-
-    Ok(all_data)
-}
-
-pub fn read_list_recursive(
-    path: &Path,
-    config: &Config,
-) -> Result<BTreeMap<PathBuf, Vec<String>>, io::Error> {
-    let mut res: BTreeMap<PathBuf, Vec<String>> = BTreeMap::new();
-
-    let path = Path::new(path);
-    let mut sub_directories: Vec<String> = Vec::new();
-    let mut contents: Vec<String> = Vec::new();
-    for entries in fs::read_dir(&path).unwrap() {
-        let entries = entries.unwrap();
-
-        let file_name = entries.file_name();
-        if config.almost_all == false && file_name.to_string_lossy().starts_with(".") {
-            continue;
-        }
-
-        let path = entries.path();
-        let metadata = path.metadata().expect("metadata call failed");
-
-        if config.show_subdirectories_content && path.is_dir() {
-            sub_directories.push(file_name.into_string().unwrap());
-        }
-
-        let last_modified_time: DateTime<Local> = metadata.modified().unwrap().into();
-
-        let permission_in_string = parse_permissions(metadata.permissions().mode());
-        let user_name = get_user_by_uid(metadata.uid()).unwrap();
-        let group_name = get_group_by_gid(metadata.gid()).unwrap();
-        let last_modified_time = last_modified_time.format("%b %d %H:%M").to_string();
-        let size = if config.human_readable_size {
-            format_size(metadata.size())
-        } else {
-            metadata.size().to_string()
+        let user_name = match get_user_by_uid(metadata.uid()) {
+            Some(user) => user.name().to_os_string(),
+            None => OsString::from("User not found"),
         };
 
-        let content = format!(
-            "{0} {1} {2} {3} {4} {5} {6}",
-            permission_in_string,
-            metadata.nlink(),
-            user_name.name().display(),
-            group_name.name().display(),
-            size,
-            last_modified_time,
-            entries.file_name().display()
-        );
+        let group_name = match get_group_by_gid(metadata.gid()) {
+            Some(group) => group.name().to_os_string(),
+            None => OsString::from("Group not found"),
+        };
 
-        contents.push(content);
+        let last_modified_time: DateTime<Local> = metadata.modified()?.into();
+        let last_modified_time: String = last_modified_time.format("%b %d %H:%M").to_string();
+
+        Ok(FileMetaData {
+            permission: parse_permissions(permission),
+            nlink: nlink,
+            user_name: user_name,
+            group_name: group_name,
+            size_in_bytes: size,
+            last_modified: last_modified_time,
+            file_name: file_name,
+        })
+    }
+}
+
+pub fn read_directory(path: &Path) -> Result<Vec<FileMetaData>, io::Error> {
+    if !path.is_dir() {
+        eprintln!("expected directory found {}", path.display());
+        exit(1);
     }
 
-    if config.print_reverse {
-        contents.reverse();
-        sub_directories.reverse();
-    }
+    let entries = fs::read_dir(path)?;
 
-    res.insert(path.to_path_buf(), contents);
-
-    if config.show_subdirectories_content {
-        for sub_directory in sub_directories {
-            let full_path = path.join(&sub_directory);
-            let sub_dir_contents = read_list_recursive(&full_path, &config).unwrap();
-
-            res.extend(sub_dir_contents);
+    let mut res: Vec<FileMetaData> = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => {
+                let entry = FileMetaData::extract_metadata_from_dir_entry(&entry)?;
+                res.push(entry);
+            }
+            Err(err) => {
+                eprintln!("unable to read the content {}", err.to_string());
+            }
         }
     }
 
     Ok(res)
+}
+
+pub fn sort_directory_entries_by_file_name(contents: &mut Vec<FileMetaData>) {
+    contents.sort_by(|a, b| {
+        let a_file_name = &a.file_name;
+        let b_file_name = &b.file_name;
+
+        let a_str = a_file_name.to_string_lossy().to_lowercase();
+        let b_str = b_file_name.to_string_lossy().to_lowercase();
+
+        // Strip the leading dot if it exists for the sake of comparison
+        let a_normalized = a_str.strip_prefix('.').unwrap_or(&a_str);
+        let b_normalized = b_str.strip_prefix('.').unwrap_or(&b_str);
+
+        a_normalized.cmp(b_normalized)
+    });
 }
 
 fn parse_permissions(mode: u32) -> String {
@@ -241,38 +127,4 @@ fn parse_permissions(mode: u32) -> String {
     }
 
     s
-}
-
-pub fn format_size(bytes: u64) -> String {
-    let units = ["B", "K", "M", "G", "T", "P"];
-    let mut size = bytes as f64;
-    let mut unit_index = 0;
-
-    // Scale the number down by 1024 for each unit
-    while size >= 1024.0 && unit_index < units.len() - 1 {
-        size /= 1024.0;
-        unit_index += 1;
-    }
-
-    // Formatting rules:
-    // 1. If it's just bytes, don't show decimals (e.g., "12B")
-    // 2. If it's a directory (usually 4096 bytes), show "4.0K"
-    // 3. For larger files, show one decimal place (e.g., "120K", "1.2M")
-    if unit_index == 0 {
-        format!("{}{}", bytes, units[unit_index])
-    } else {
-        format!("{:.1}{}", size, units[unit_index])
-    }
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn show_all_directory_content() {
-        let path = Path::new("/home/sanskar/Desktop");
-
-        let contents = read_contents_of_given_directory(&path);
-        assert_eq!(false, contents.unwrap().is_empty());
-    }
 }
