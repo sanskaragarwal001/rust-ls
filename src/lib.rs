@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::fs::{self, DirEntry};
 use std::io::{self};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use uzers::{get_group_by_gid, get_user_by_uid};
 
@@ -18,6 +18,7 @@ pub struct FileMetaData {
     pub group_name: OsString,
     pub size_in_bytes: u64,
     pub last_modified: String,
+    pub is_directory: bool,
     pub file_name: OsString,
 }
 
@@ -48,6 +49,7 @@ impl FileMetaData {
             nlink: nlink,
             user_name: user_name,
             group_name: group_name,
+            is_directory: metadata.is_dir(),
             size_in_bytes: size,
             last_modified: last_modified_time,
             file_name: file_name,
@@ -79,7 +81,7 @@ pub fn read_directory(path: &Path) -> Result<Vec<FileMetaData>, io::Error> {
     Ok(res)
 }
 
-pub fn sort_directory_entries_by_file_name(contents: &mut Vec<FileMetaData>) {
+fn sort_directory_entries_by_file_name(contents: &mut Vec<FileMetaData>) {
     contents.sort_by(|a, b| {
         let a_file_name = &a.file_name;
         let b_file_name = &b.file_name;
@@ -95,7 +97,7 @@ pub fn sort_directory_entries_by_file_name(contents: &mut Vec<FileMetaData>) {
     });
 }
 
-pub fn print_on_console(entries: &mut Vec<FileMetaData>, config: &LsConfig) {
+pub fn print_on_console(path: &PathBuf, entries: &mut Vec<FileMetaData>, config: &LsConfig) {
     if config.sorted_order {
         sort_directory_entries_by_file_name(entries);
     }
@@ -103,7 +105,7 @@ pub fn print_on_console(entries: &mut Vec<FileMetaData>, config: &LsConfig) {
         entries.reverse();
     }
 
-    for entry in entries {
+    for entry in entries.into_iter() {
         if config.almost_all == false && entry.file_name.to_string_lossy().starts_with(".") {
             continue;
         }
@@ -137,6 +139,24 @@ pub fn print_on_console(entries: &mut Vec<FileMetaData>, config: &LsConfig) {
             } else {
                 print!("{} ", entry.file_name.display());
             }
+        }
+    }
+    print!("\n");
+
+    if config.recursive {
+        for entry in entries.into_iter() {
+            if config.almost_all == false && entry.file_name.to_string_lossy().starts_with(".") {
+                continue;
+            }
+            if !entry.is_directory {
+                continue;
+            }
+
+            let dir_path = path.join(&entry.file_name);
+            let mut sub_entries = read_directory(&dir_path).unwrap();
+
+            println!("{}", dir_path.display());
+            print_on_console(&dir_path, &mut sub_entries, &config);
         }
     }
 }

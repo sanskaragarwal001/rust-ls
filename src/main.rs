@@ -9,7 +9,6 @@ fn main() {
     for path in &config.paths {
         let mut entries = read_directory(path.as_path()).unwrap();
         println!("{}:", path.display());
-        print_on_console(&mut entries, &config);
-        print!("\n");
+        print_on_console(path, &mut entries, &config);
     }
 }
